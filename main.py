@@ -1,5 +1,6 @@
 import pandas as pd
 import numpy as np
+import csv
 import sys
 from impyute.imputation.cs import mice
 from data_functions import data_preprocessing, one_hot_encoding, data_normalization, get_groups_from_json
@@ -61,13 +62,13 @@ def train_logistic_regression(X, Y, classes, features):
 
 
 def train_neural_network(X, Y, epochs, features, classes, X_test):
-    X_train = X[:3200, :]
-    Y_train = one_hot_encoding(classes, Y[:3200])
-    X_val = X[3200:3600, :]
-    Y_val = one_hot_encoding(classes, Y[3200:3600])
-    X_test = X[3600:4000, :]
-    Y_test = one_hot_encoding(classes, Y[3600:4000])
-    # Y = one_hot_encoding(2, Y)
+    # X_train = X[:3200, :]
+    # Y_train = one_hot_encoding(classes, Y[:3200])
+    # X_val = X[3200:3600, :]
+    # Y_val = one_hot_encoding(classes, Y[3200:3600])
+    # X_test = X[3600:4000, :]
+    # Y_test = one_hot_encoding(classes, Y[3600:4000])
+    Y = one_hot_encoding(2, Y)
     model = models.Sequential()
 
     model.add(layers.Dense(16, activation='relu', input_shape=(features,)))
@@ -75,34 +76,38 @@ def train_neural_network(X, Y, epochs, features, classes, X_test):
     model.add(layers.Dense(8, activation='relu'))
     model.add(layers.Dense(2, activation='softmax'))
     model.compile(optimizer='rmsprop', loss='categorical_crossentropy', metrics=['accuracy'])
-    # history = model.fit(X, Y, epochs=epochs, batch_size=256)
-    # predictions = model.predict(X_test)
-    history = model.fit(X_train, Y_train, epochs=epochs, batch_size=256, validation_data=(X_val, Y_val))
+    history = model.fit(X, Y, epochs=epochs, batch_size=256)
+    results = model.predict(X_test)
+    Y_predictions = [0 if values[0] > values[1] else 1 for values in results]
+    IDs = range(2000)
+    return pd.DataFrame(
+        {'userd_id': IDs, 'probability_of_one': [prediction[1] for prediction in results], 'target': Y_predictions})
+    # history = model.fit(X_train, Y_train, epochs=epochs, batch_size=256, validation_data=(X_val, Y_val))
 
-    loss = history.history['loss']
-    val_loss = history.history['val_loss']
-    epochs = range(1, len(loss) + 1)
-    plt.plot(epochs, loss, 'bo', label='Training loss')
-    plt.plot(epochs, val_loss, 'b', label='Validation loss')
-    plt.title('Training and validation loss')
-    plt.xlabel('Epochs')
-    plt.ylabel('Loss')
-    plt.legend()
-    plt.show()
-
-    plt.clf()
-
-    acc = history.history['accuracy']
-    val_acc = history.history['val_accuracy']
-    plt.plot(epochs, acc, 'bo', label='Training acc')
-    plt.plot(epochs, val_acc, 'b', label='Validation acc')
-    plt.title('Training and validation accuracy')
-    plt.xlabel('Epochs')
-    plt.ylabel('Loss')
-    plt.legend()
-    plt.show()
-
-    model.evaluate(X_test, Y_test)
+    # loss = history.history['loss']
+    # val_loss = history.history['val_loss']
+    # epochs = range(1, len(loss) + 1)
+    # plt.plot(epochs, loss, 'bo', label='Training loss')
+    # plt.plot(epochs, val_loss, 'b', label='Validation loss')
+    # plt.title('Training and validation loss')
+    # plt.xlabel('Epochs')
+    # plt.ylabel('Loss')
+    # plt.legend()
+    # plt.show()
+    #
+    # plt.clf()
+    #
+    # acc = history.history['accuracy']
+    # val_acc = history.history['val_accuracy']
+    # plt.plot(epochs, acc, 'bo', label='Training acc')
+    # plt.plot(epochs, val_acc, 'b', label='Validation acc')
+    # plt.title('Training and validation accuracy')
+    # plt.xlabel('Epochs')
+    # plt.ylabel('Loss')
+    # plt.legend()
+    # plt.show()
+    #
+    # model.evaluate(X_test, Y_test)
 
     # results = model.predict(X_test)
     # Y_predictions = [0 if values[0] > values[1] else 1 for values in results]
@@ -122,29 +127,33 @@ X, Y = X[:, 1:], X[:, 0]
 
 X = mice(X)
 
-# X_test = pd.read_csv("Case_Assignment/test.csv")
-# X_test = X_test.sort_values((['user_id']))
-# data_preprocessing(X_test)
-# data_normalization(X_test)
-# X_test = pd.concat([X_test, get_groups_from_json('test')], axis=1)
-# X_test = X_test[COLUMNS].to_numpy()
-# X_test = X_test[:, 1:]
-# X_test = mice(X_test)
+X_test = pd.read_csv("Case_Assignment/test.csv")
+X_test = X_test.sort_values((['user_id']))
+data_preprocessing(X_test)
+data_normalization(X_test)
+X_test = pd.concat([X_test, get_groups_from_json('test')], axis=1)
+X_test = X_test[COLUMNS].to_numpy()
+X_test = X_test[:, 1:]
+X_test = mice(X_test)
 
-# train_neural_network(X, Y, 25, 9, 2, None)
-N = 100
-estimators = 200
-random_forest_results = []
-random_forest_results2 = []
-ada_boost_results = []
-logistic_regression_results = []
-for i in range(N):
-    random_forest_results.append(train_random_forest(X, Y, estimators, 2, 9))
-    ada_boost_results.append(train_ada_boost(X, Y, estimators, 2, 9))
-    logistic_regression_results.append(train_logistic_regression(X, Y, 2, 9))
-fig = plt.figure()
-plt.plot(range(N), random_forest_results, '.-r', label='random_forest')
-plt.plot(range(N), ada_boost_results, 'o-b', label='ada_boost')
-plt.plot(range(N), logistic_regression_results, '+-y', label='logistic_regression')
-plt.legend()
-plt.show()
+results = train_neural_network(X, Y, 25, 9, 2, X_test).to_numpy()
+with open('Case_Assignment/scored_test.csv', mode='w') as file:
+    writer = csv.writer(file, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
+    writer.writerow(['user_id', 'probability_of_one', 'target'])
+    writer.writerows(results)
+# N = 100
+# estimators = 200
+# random_forest_results = []
+# random_forest_results2 = []
+# ada_boost_results = []
+# logistic_regression_results = []
+# for i in range(N):
+#     random_forest_results.append(train_random_forest(X, Y, estimators, 2, 9))
+#     ada_boost_results.append(train_ada_boost(X, Y, estimators, 2, 9))
+#     logistic_regression_results.append(train_logistic_regression(X, Y, 2, 9))
+# fig = plt.figure()
+# plt.plot(range(N), random_forest_results, '.-r', label='random_forest')
+# plt.plot(range(N), ada_boost_results, 'o-b', label='ada_boost')
+# plt.plot(range(N), logistic_regression_results, '+-y', label='logistic_regression')
+# plt.legend()
+# plt.show()
