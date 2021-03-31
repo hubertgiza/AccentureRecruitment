@@ -1028,3 +1028,5 @@ ventricular hypertrophy
 cardiac hypertrophy
 vo2 max
 lactic acid
+Badminton
+bike
